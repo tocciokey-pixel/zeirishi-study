@@ -238,7 +238,11 @@ async function apiOpenPdf(themeId){
   }
   const { data, error } = await supabaseClient.storage.from(STORAGE_BUCKET).createSignedUrl(theme.pdf.path, 60);
   if(error) throw error;
-  window.open(data.signedUrl, '_blank', 'noopener');
+  // iOS Safariは新規タブがブロックされることがあるため、失敗時は同一タブで開く
+  const w = window.open(data.signedUrl, '_blank', 'noopener');
+  if(!w){
+    window.location.href = data.signedUrl;
+  }
 }
 
 function today(){
