@@ -1,0 +1,346 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-sans);color:var(--color-text-primary)}
+.screen{display:none;flex-direction:column;gap:12px;padding:8px 0}
+.screen.active{display:flex}
+.card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:16px}
+.top-bar{display:flex;align-items:center;gap:10px;padding-bottom:8px;border-bottom:0.5px solid var(--color-border-tertiary);margin-bottom:4px}
+.top-bar h2{font-size:16px;font-weight:500;flex:1}
+.tab-row{display:flex;gap:6px;margin-bottom:4px}
+.tab{flex:1;padding:8px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);background:var(--color-background-secondary);font-size:13px;cursor:pointer;text-align:center;color:var(--color-text-secondary)}
+.tab.active{background:var(--color-background-primary);border-color:var(--color-border-primary);color:var(--color-text-primary);font-weight:500}
+.btn{padding:10px 16px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:transparent;font-size:14px;cursor:pointer;color:var(--color-text-primary)}
+.btn:hover{background:var(--color-background-secondary)}
+.btn-primary{background:#185FA5;border-color:#185FA5;color:#E6F1FB}
+.btn-primary:hover{background:#0C447C}
+.btn-sm{padding:6px 10px;font-size:12px}
+.btn-danger{border-color:#A32D2D;color:#A32D2D}
+.btn-danger:hover{background:#FCEBEB}
+.badge{display:inline-block;padding:2px 8px;border-radius:100px;font-size:11px;font-weight:500}
+.badge-new{background:#E6F1FB;color:#185FA5}
+.badge-due{background:#FAEEDA;color:#854F0B}
+.badge-done{background:#EAF3DE;color:#3B6D11}
+.badge-over{background:#FCEBEB;color:#A32D2D}
+.input-row{display:flex;flex-direction:column;gap:4px}
+.input-row label{font-size:12px;color:var(--color-text-secondary)}
+input[type=text],select{width:100%;padding:8px 10px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);font-size:14px;background:var(--color-background-primary);color:var(--color-text-primary)}
+.theme-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:0.5px solid var(--color-border-tertiary)}
+.theme-item:last-child{border-bottom:none}
+.theme-info{flex:1}
+.theme-name{font-size:14px;font-weight:500}
+.theme-sub{font-size:12px;color:var(--color-text-secondary);margin-top:2px}
+.review-item{padding:10px;border-radius:var(--border-radius-md);background:var(--color-background-secondary);margin-bottom:8px}
+.review-item h4{font-size:14px;font-weight:500;margin-bottom:4px}
+.review-item p{font-size:12px;color:var(--color-text-secondary)}
+.progress-bar-bg{background:var(--color-background-secondary);border-radius:100px;height:6px;overflow:hidden;margin-top:6px}
+.progress-bar-fill{height:100%;border-radius:100px;background:#185FA5;transition:width 0.3s}
+.stat-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.stat-card{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:10px;text-align:center}
+.stat-num{font-size:22px;font-weight:500}
+.stat-label{font-size:11px;color:var(--color-text-secondary);margin-top:2px}
+.curve-row{display:flex;align-items:center;gap:8px;margin:4px 0}
+.curve-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.nav-bar{display:flex;gap:4px;justify-content:center;margin-top:4px}
+.nav-btn{flex:1;padding:10px 4px;border:none;background:transparent;font-size:11px;cursor:pointer;color:var(--color-text-secondary);border-top:2px solid transparent;display:flex;flex-direction:column;align-items:center;gap:3px}
+.nav-btn.active{color:#185FA5;border-top-color:#185FA5}
+.nav-icon{font-size:18px;line-height:1}
+.empty{text-align:center;padding:24px;color:var(--color-text-secondary);font-size:13px}
+</style>
+
+<div style="max-width:400px;margin:0 auto;padding:8px">
+
+<div class="tab-row">
+  <div class="tab active" onclick="switchTab('today')">今日</div>
+  <div class="tab" onclick="switchTab('themes')">テーマ</div>
+  <div class="tab" onclick="switchTab('add')">追加</div>
+  <div class="tab" onclick="switchTab('stats')">進捗</div>
+</div>
+
+<!-- TODAY screen -->
+<div id="tab-today" class="screen active">
+  <div class="card">
+    <div id="today-date" style="font-size:12px;color:var(--color-text-secondary);margin-bottom:8px"></div>
+    <div id="today-summary"></div>
+  </div>
+  <div class="card">
+    <div style="font-size:13px;font-weight:500;margin-bottom:10px">今日の復習リスト</div>
+    <div id="review-list"></div>
+  </div>
+</div>
+
+<!-- THEMES screen -->
+<div id="tab-themes" class="screen">
+  <div class="card">
+    <div style="font-size:13px;font-weight:500;margin-bottom:10px">登録テーマ一覧</div>
+    <div id="themes-list"></div>
+  </div>
+</div>
+
+<!-- ADD screen -->
+<div id="tab-add" class="screen">
+  <div class="card">
+    <div style="font-size:13px;font-weight:500;margin-bottom:12px">新しいテーマを追加</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div class="input-row">
+        <label>科目</label>
+        <select id="add-subject">
+          <option value="簿記論">簿記論</option>
+          <option value="財務諸表論">財務諸表論</option>
+        </select>
+      </div>
+      <div class="input-row">
+        <label>テーマ名</label>
+        <input type="text" id="add-name" placeholder="例：棚卸資産の評価">
+      </div>
+      <div class="input-row">
+        <label>学習日（初回）</label>
+        <input type="text" id="add-date" placeholder="例：2026-03-16">
+      </div>
+      <button class="btn btn-primary" onclick="addTheme()">追加する</button>
+    </div>
+  </div>
+  <div class="card">
+    <div style="font-size:12px;font-weight:500;margin-bottom:8px">忘却曲線の復習タイミング</div>
+    <div style="font-size:12px;color:var(--color-text-secondary);line-height:1.8">
+      <div class="curve-row"><div class="curve-dot" style="background:#185FA5"></div><span>1日後（翌日）</span></div>
+      <div class="curve-row"><div class="curve-dot" style="background:#0F6E56"></div><span>3日後</span></div>
+      <div class="curve-row"><div class="curve-dot" style="background:#854F0B"></div><span>7日後（1週間後）</span></div>
+      <div class="curve-row"><div class="curve-dot" style="background:#993C1D"></div><span>14日後（2週間後）</span></div>
+      <div class="curve-row"><div class="curve-dot" style="background:#A32D2D"></div><span>30日後（1ヶ月後）</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- STATS screen -->
+<div id="tab-stats" class="screen">
+  <div class="card">
+    <div style="font-size:13px;font-weight:500;margin-bottom:10px">学習進捗</div>
+    <div class="stat-row" id="stat-row"></div>
+  </div>
+  <div class="card">
+    <div style="font-size:13px;font-weight:500;margin-bottom:10px">試験まで</div>
+    <div id="exam-countdown"></div>
+  </div>
+  <div class="card">
+    <div style="font-size:13px;font-weight:500;margin-bottom:8px">科目別進捗</div>
+    <div id="subject-progress"></div>
+  </div>
+</div>
+
+</div>
+
+<script>
+const EXAM_DATE = new Date('2026-08-01');
+const INTERVALS = [1,3,7,14,30];
+
+function loadData(){
+  try{
+    const d = localStorage.getItem('zeirishi_data');
+    return d ? JSON.parse(d) : {themes:[]};
+  }catch(e){return {themes:[]};}
+}
+function saveData(d){
+  try{localStorage.setItem('zeirishi_data',JSON.stringify(d));}catch(e){}
+}
+
+function today(){
+  const d=new Date();
+  return d.toISOString().slice(0,10);
+}
+
+function addDays(dateStr,n){
+  const d=new Date(dateStr);
+  d.setDate(d.getDate()+n);
+  return d.toISOString().slice(0,10);
+}
+
+function getReviewDates(learnDate){
+  return INTERVALS.map(i=>addDays(learnDate,i));
+}
+
+function getNextReview(theme){
+  const reviews = getReviewDates(theme.learnDate);
+  const done = theme.doneReviews || [];
+  for(let i=0;i<reviews.length;i++){
+    if(!done.includes(i)) return {date:reviews[i],idx:i,total:reviews.length};
+  }
+  return null;
+}
+
+function switchTab(t){
+  document.querySelectorAll('.tab').forEach((el,i)=>{
+    el.classList.toggle('active',['today','themes','add','stats'][i]===t);
+  });
+  document.querySelectorAll('.screen').forEach(el=>el.classList.remove('active'));
+  document.getElementById('tab-'+t).classList.add('active');
+  if(t==='today') renderToday();
+  if(t==='themes') renderThemes();
+  if(t==='stats') renderStats();
+}
+
+function addTheme(){
+  const name=document.getElementById('add-name').value.trim();
+  const subject=document.getElementById('add-subject').value;
+  let date=document.getElementById('add-date').value.trim();
+  if(!date) date=today();
+  if(!name){alert('テーマ名を入力してください');return;}
+  const data=loadData();
+  data.themes.push({id:Date.now(),name,subject,learnDate:date,doneReviews:[]});
+  saveData(data);
+  document.getElementById('add-name').value='';
+  document.getElementById('add-date').value='';
+  alert('追加しました！');
+}
+
+function markDone(themeId,idx){
+  const data=loadData();
+  const t=data.themes.find(x=>x.id===themeId);
+  if(t){
+    if(!t.doneReviews) t.doneReviews=[];
+    if(!t.doneReviews.includes(idx)) t.doneReviews.push(idx);
+  }
+  saveData(data);
+  renderToday();
+}
+
+function deleteTheme(themeId){
+  if(!confirm('このテーマを削除しますか？'))return;
+  const data=loadData();
+  data.themes=data.themes.filter(x=>x.id!==themeId);
+  saveData(data);
+  renderThemes();
+}
+
+function renderToday(){
+  const data=loadData();
+  const t=today();
+  const el=document.getElementById('today-date');
+  const d=new Date(t);
+  el.textContent=d.getFullYear()+'年'+(d.getMonth()+1)+'月'+d.getDate()+'日';
+
+  const due=[];
+  const overdue=[];
+  data.themes.forEach(theme=>{
+    const next=getNextReview(theme);
+    if(!next) return;
+    if(next.date===t) due.push({theme,next});
+    else if(next.date<t) overdue.push({theme,next});
+  });
+
+  const sum=document.getElementById('today-summary');
+  const total=due.length+overdue.length;
+  if(total===0){
+    sum.innerHTML='<div style="font-size:13px;color:var(--color-text-secondary)">今日の復習はありません。お疲れ様！</div>';
+  } else {
+    sum.innerHTML='<div style="font-size:13px">今日の復習：<strong>'+total+'件</strong>'+(overdue.length>0?' （遅れ '+overdue.length+'件）':'')+'</div>';
+  }
+
+  const list=document.getElementById('review-list');
+  if(total===0){
+    list.innerHTML='<div class="empty">復習完了 — 今日はゆっくり休もう</div>';
+    return;
+  }
+  list.innerHTML='';
+  [...overdue,...due].forEach(({theme,next})=>{
+    const isOver=next.date<t;
+    const div=document.createElement('div');
+    div.className='review-item';
+    const labels=['1日後','3日後','1週間後','2週間後','1ヶ月後'];
+    div.innerHTML=`
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <div class="badge badge-${isOver?'over':'due'}">${isOver?'遅れ':labels[next.idx]}</div>
+        <span style="font-size:12px;color:var(--color-text-secondary)">${theme.subject}</span>
+      </div>
+      <h4>${theme.name}</h4>
+      <p style="margin-top:4px">${labels[next.idx]}の復習（${next.idx+1}/${next.total}回目）</p>
+      <div style="margin-top:8px">
+        <button class="btn btn-sm btn-primary" onclick="markDone(${theme.id},${next.idx})">復習完了 ✓</button>
+      </div>`;
+    list.appendChild(div);
+  });
+}
+
+function renderThemes(){
+  const data=loadData();
+  const list=document.getElementById('themes-list');
+  if(data.themes.length===0){
+    list.innerHTML='<div class="empty">テーマが登録されていません<br>「追加」タブから登録しましょう</div>';
+    return;
+  }
+  list.innerHTML='';
+  data.themes.forEach(theme=>{
+    const next=getNextReview(theme);
+    const done=theme.doneReviews?theme.doneReviews.length:0;
+    const total=INTERVALS.length;
+    const complete=!next;
+    const div=document.createElement('div');
+    div.className='theme-item';
+    let badgeHtml='';
+    if(complete) badgeHtml='<span class="badge badge-done">完了</span>';
+    else if(next.date<today()) badgeHtml='<span class="badge badge-over">遅れ</span>';
+    else if(next.date===today()) badgeHtml='<span class="badge badge-due">今日</span>';
+    else badgeHtml='<span class="badge badge-new">'+next.date+'</span>';
+    div.innerHTML=`
+      <div class="theme-info">
+        <div class="theme-name">${theme.name}</div>
+        <div class="theme-sub">${theme.subject} · 復習 ${done}/${total}回</div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${Math.round(done/total*100)}%"></div></div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+        ${badgeHtml}
+        <button class="btn btn-sm btn-danger" onclick="deleteTheme(${theme.id})">削除</button>
+      </div>`;
+    list.appendChild(div);
+  });
+}
+
+function renderStats(){
+  const data=loadData();
+  const t=today();
+  let totalDone=0,totalReviews=0,completedThemes=0;
+  const bySubject={};
+  data.themes.forEach(theme=>{
+    const done=theme.doneReviews?theme.doneReviews.length:0;
+    totalDone+=done;
+    totalReviews+=INTERVALS.length;
+    if(!getNextReview(theme)) completedThemes++;
+    if(!bySubject[theme.subject]) bySubject[theme.subject]={themes:0,done:0,total:0};
+    bySubject[theme.subject].themes++;
+    bySubject[theme.subject].done+=done;
+    bySubject[theme.subject].total+=INTERVALS.length;
+  });
+
+  document.getElementById('stat-row').innerHTML=`
+    <div class="stat-card"><div class="stat-num">${data.themes.length}</div><div class="stat-label">登録テーマ</div></div>
+    <div class="stat-card"><div class="stat-num">${totalDone}</div><div class="stat-label">累計復習回数</div></div>
+    <div class="stat-card"><div class="stat-num">${completedThemes}</div><div class="stat-label">完了テーマ</div></div>
+  `;
+
+  const exam=new Date(EXAM_DATE);
+  const now=new Date();
+  const diff=Math.ceil((exam-now)/(1000*60*60*24));
+  document.getElementById('exam-countdown').innerHTML=`
+    <div style="text-align:center;padding:12px 0">
+      <div style="font-size:36px;font-weight:500;color:#185FA5">${diff}</div>
+      <div style="font-size:13px;color:var(--color-text-secondary)">日後（2026年8月1日）</div>
+    </div>`;
+
+  const sp=document.getElementById('subject-progress');
+  sp.innerHTML='';
+  Object.entries(bySubject).forEach(([sub,s])=>{
+    const pct=s.total>0?Math.round(s.done/s.total*100):0;
+    sp.innerHTML+=`
+      <div style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
+          <span>${sub}</span><span style="color:var(--color-text-secondary)">${s.themes}テーマ · ${pct}%</span>
+        </div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
+      </div>`;
+  });
+  if(Object.keys(bySubject).length===0) sp.innerHTML='<div class="empty">テーマを登録すると進捗が表示されます</div>';
+}
+
+document.getElementById('add-date').value=today();
+renderToday();
+</script>
