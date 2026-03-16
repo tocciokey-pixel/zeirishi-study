@@ -151,6 +151,7 @@ const STORAGE_BUCKET = 'zeirishi-pdfs';
 
 const EXAM_DATE = new Date('2026-08-01');
 const INTERVALS = [1,3,7,14,30];
+const PASS_SCORE = 80;
 
 let THEMES_CACHE = [];
 
@@ -207,11 +208,50 @@ async function apiAddTheme({ name, subject, learnDate, pdfFile }){
   }
 }
 
-async function apiMarkDone(themeId, idx){
+function normalizeDoneReviews(doneReviews){
+  // 旧形式: [0,1,2]（完了インデックス配列）
+  // 新形式: [{idx:0, score:85, at:'2026-03-16'}]（得点付き）
+  if(!Array.isArray(doneReviews)) return [];
+  const out = [];
+  for(const it of doneReviews){
+    if(typeof it === 'number'){
+      out.push({ idx: it, score: 100, at: null });
+    } else if(it && typeof it === 'object' && typeof it.idx === 'number'){
+      out.push({
+        idx: it.idx,
+        score: typeof it.score === 'number' ? it.score : 0,
+        at: typeof it.at === 'string' ? it.at : null
+      });
+    }
+  }
+  // idxごとに最新（後勝ち）を残す
+  const map = new Map();
+  for(const r of out) map.set(r.idx, r);
+  return [...map.values()].sort((a,b)=>a.idx-b.idx);
+}
+
+function getReviewResult(theme, idx){
+  const norm = normalizeDoneReviews(theme.doneReviews);
+  return norm.find(r => r.idx === idx) || null;
+}
+
+function isPassed(theme, idx){
+  const r = getReviewResult(theme, idx);
+  return !!(r && r.score >= PASS_SCORE);
+}
+
+async function apiUpsertReviewResult(themeId, idx, score){
   assertSupabaseConfigured();
   const theme = THEMES_CACHE.find(t => t.id === themeId);
-  const nextDone = Array.isArray(theme?.doneReviews) ? [...theme.doneReviews] : [];
-  if(!nextDone.includes(idx)) nextDone.push(idx);
+  const nextDone = normalizeDoneReviews(theme?.doneReviews);
+  const at = today();
+  const existing = nextDone.find(r => r.idx === idx);
+  if(existing){
+    existing.score = score;
+    existing.at = at;
+  } else {
+    nextDone.push({ idx, score, at });
+  }
   const { error } = await supabaseClient
     .from('themes')
     .update({ done_reviews: nextDone })
@@ -262,9 +302,15 @@ function getReviewDates(learnDate){
 
 function getNextReview(theme){
   const reviews = getReviewDates(theme.learnDate);
-  const done = theme.doneReviews || [];
+  // 80%未満なら、忘却曲線より優先して「今日」へ出す
   for(let i=0;i<reviews.length;i++){
-    if(!done.includes(i)) return {date:reviews[i],idx:i,total:reviews.length};
+    const r = getReviewResult(theme, i);
+    if(r && r.score < PASS_SCORE){
+      return { date: today(), idx: i, total: reviews.length, retry: true, score: r.score };
+    }
+  }
+  for(let i=0;i<reviews.length;i++){
+    if(!isPassed(theme, i)) return {date:reviews[i],idx:i,total:reviews.length, retry: false};
   }
   return null;
 }
@@ -306,7 +352,14 @@ function addTheme(){
 function markDone(themeId,idx){
   (async ()=>{
     try{
-      await apiMarkDone(themeId, idx);
+      const v = prompt('今回の復習の得点（%）を入力してください（0〜100）', '80');
+      if(v===null) return; // キャンセル
+      const score = Number(v);
+      if(!Number.isFinite(score) || score < 0 || score > 100){
+        alert('0〜100の数字を入力してください');
+        return;
+      }
+      await apiUpsertReviewResult(themeId, idx, score);
       await renderToday();
     }catch(e){
       alert('更新に失敗しました：'+(e?.message || e));
@@ -389,7 +442,7 @@ async function renderThemes(){
   list.innerHTML='';
   THEMES_CACHE.forEach(theme=>{
     const next=getNextReview(theme);
-    const done=theme.doneReviews?theme.doneReviews.length:0;
+    const passedCount = INTERVALS.reduce((acc,_,i)=>acc + (isPassed(theme,i)?1:0), 0);
     const total=INTERVALS.length;
     const complete=!next;
     const div=document.createElement('div');
@@ -403,9 +456,9 @@ async function renderThemes(){
     div.innerHTML=`
       <div class="theme-info">
         <div class="theme-name">${theme.name}</div>
-        <div class="theme-sub">${theme.subject} · 復習 ${done}/${total}回</div>
+        <div class="theme-sub">${theme.subject} · 合格 ${passedCount}/${total}回（${PASS_SCORE}%以上）</div>
         ${pdfLine}
-        <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${Math.round(done/total*100)}%"></div></div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${Math.round(passedCount/total*100)}%"></div></div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
         ${badgeHtml}
@@ -421,13 +474,13 @@ async function renderStats(){
   let totalDone=0,totalReviews=0,completedThemes=0;
   const bySubject={};
   THEMES_CACHE.forEach(theme=>{
-    const done=theme.doneReviews?theme.doneReviews.length:0;
-    totalDone+=done;
+    const passedCount = INTERVALS.reduce((acc,_,i)=>acc + (isPassed(theme,i)?1:0), 0);
+    totalDone+=passedCount;
     totalReviews+=INTERVALS.length;
     if(!getNextReview(theme)) completedThemes++;
     if(!bySubject[theme.subject]) bySubject[theme.subject]={themes:0,done:0,total:0};
     bySubject[theme.subject].themes++;
-    bySubject[theme.subject].done+=done;
+    bySubject[theme.subject].done+=passedCount;
     bySubject[theme.subject].total+=INTERVALS.length;
   });
 
